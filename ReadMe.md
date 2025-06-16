@@ -1,5 +1,3 @@
-理解你的问题: doing
-收集相关的信息: doing
 # AI-RAG-Knowledge 智能知识库系统
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://www.apache.org/licenses/LICENSE-2.0)
