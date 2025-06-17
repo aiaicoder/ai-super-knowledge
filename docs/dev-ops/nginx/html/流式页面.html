@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 对话助手</title>
+    <script src="https://cdn.tailwindcss.com"></script> 
+    <style>
+        /* 自定义滚动条样式 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* 打字机效果 */
+        .typing-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 20px;
+            background: #4b5563;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <div class="container mx-auto max-w-4xl px-4 py-8 flex flex-col h-screen">
+        <!-- 标题 -->
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">AI 对话助手</h1>
+            <p class="text-gray-600">基于 Ollama 模型的流式对话体验</p>
+        </header>
+        
+        <!-- 对话区域 -->
+        <div id="chat-container" class="flex-1 bg-white rounded-lg shadow-md p-4 mb-4 overflow-y-auto custom-scrollbar">
+            <div id="messages" class="space-y-4">
+                <!-- 初始欢迎消息 -->
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <p class="text-gray-800">您好！我是AI助手，请问有什么可以帮您的吗？</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 输入区域 -->
+        <div class="bg-white rounded-lg shadow-md p-4">
+            <div class="flex space-x-2">
+                <input 
+                    id="message-input" 
+                    type="text" 
+                    placeholder="输入您的问题..." 
+                    class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autocomplete="off"
+                >
+                <button 
+                    id="send-button" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                    发送 
+                </button>
+            </div>
+            <div class="mt-2 flex items-center">
+                <label for="model-select" class="text-sm text-gray-600 mr-2">模型:</label>
+                <select 
+                    id="model-select" 
+                    class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                    <option value="deepseek-r1:1.5b">deepseek-r1:1.5b</option>
+                    <!-- 可以添加更多模型选项 -->
+                </select>
+            </div>
+        </div>
+    </div>
+ 
+    <script>
+        document.addEventListener('DOMContentLoaded',  function() {
+            const messageInput = document.getElementById('message-input'); 
+            const sendButton = document.getElementById('send-button'); 
+            const messagesContainer = document.getElementById('messages'); 
+            const modelSelect = document.getElementById('model-select'); 
+            const chatContainer = document.getElementById('chat-container'); 
+            
+            // 当前正在进行的流式响应ID 
+            let currentResponseId = null;
+            
+            // 发送消息 
+            function sendMessage() {
+                const message = messageInput.value.trim(); 
+                const model = modelSelect.value; 
+                
+                if (!message) {
+                    return;
+                }
+                
+                // 添加用户消息到对话 
+                addMessage('user', message);
+                messageInput.value  = '';
+                
+                // 添加AI响应占位 
+                currentResponseId = 'response-' + Date.now(); 
+                addMessage('assistant', '', currentResponseId);
+                
+                // 调用API 
+                callStreamingAPI(model, message, currentResponseId);
+            }
+            
+            // 添加消息到对话 
+            function addMessage(role, content, id = null) {
+                const messageDiv = document.createElement('div'); 
+                messageDiv.className  = role === 'user' 
+                    ? 'bg-gray-100 p-4 rounded-lg self-end max-w-[90%] ml-auto'
+                    : 'bg-blue-50 p-4 rounded-lg max-w-[90%]';
+                
+                if (id) {
+                    messageDiv.id  = id;
+                }
+                
+                if (content) {
+                    messageDiv.innerHTML  = `<p class="text-gray-800">${content}</p>`;
+                } else {
+                    // 添加打字机光标效果 
+                    messageDiv.innerHTML  = '<p class="text-gray-800"><span class="typing-cursor"></span></p>';
+                }
+                
+                messagesContainer.appendChild(messageDiv); 
+                chatContainer.scrollTop  = chatContainer.scrollHeight; 
+            }
+            
+            // 更新AI响应 
+            function updateResponse(id, content) {
+                const responseDiv = document.getElementById(id); 
+                if (responseDiv) {
+                    responseDiv.innerHTML  = `<p class="text-gray-800">${content}</p>`;
+                    chatContainer.scrollTop  = chatContainer.scrollHeight; 
+                }
+            }
+            
+            // 调用流式API 
+            function callStreamingAPI(model, message, responseId) {
+                const apiUrl = `http://localhost:8090/api/v1/ollama/generate_stream?model=${encodeURIComponent(model)}&message=${encodeURIComponent(message)}`;
+                
+                let fullResponse = '';
+                const eventSource = new EventSource(apiUrl);
+                
+                eventSource.onmessage  = function(event) {
+                    try {
+                        const data = JSON.parse(event.data); 
+                        const content = data.result?.output?.content  || '';
+                        
+                        if (content) {
+                            fullResponse += content;
+                            updateResponse(responseId, fullResponse);
+                        }
+                        
+                        // 检查是否结束 
+                        if (data.result?.metadata?.finishReason  === 'STOP') {
+                            eventSource.close(); 
+                            currentResponseId = null;
+                        }
+                    } catch (error) {
+                        console.error(' 解析响应错误:', error);
+                        eventSource.close(); 
+                        currentResponseId = null;
+                    }
+                };
+                
+                eventSource.onerror  = function() {
+                    eventSource.close(); 
+                    currentResponseId = null;
+                    
+                    // 如果没有任何响应，显示错误 
+                    const responseDiv = document.getElementById(responseId); 
+                    if (responseDiv && responseDiv.textContent.trim()  === '') {
+                        responseDiv.innerHTML  = '<p class="text-red-500">请求发生错误，请重试</p>';
+                    }
+                };
+            }
+            
+            // 事件监听 
+            sendButton.addEventListener('click',  sendMessage);
+            
+            messageInput.addEventListener('keypress',  function(e) {
+                if (e.key  === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
