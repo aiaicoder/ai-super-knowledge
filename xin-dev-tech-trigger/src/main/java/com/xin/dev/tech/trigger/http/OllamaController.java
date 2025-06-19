@@ -17,7 +17,7 @@ import reactor.core.publisher.Flux;
  * @version 1.0
  * @date 2025/6/17 20:36
  */
-@RequestMapping("/api/ai/ollama")
+@RequestMapping("/api/v1/ollama")
 @CrossOrigin("*")
 @RestController()
 public class OllamaController implements IAiService {
