@@ -48,6 +48,7 @@ public class RagController implements IRagService {
     @Override
     @RequestMapping(value = "file/upload", method = RequestMethod.POST, headers = "content-Type=multipart/form-data")
     public Response<String> uploadFile(@RequestParam String ragTag, @RequestParam(value ="file")List<MultipartFile> files) {
+        log.info("上传知识库开始");
         for (MultipartFile file : files) {
             TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(file.getResource());
             List<Document> documents = tikaDocumentReader.get();
@@ -62,7 +63,6 @@ public class RagController implements IRagService {
                 elements.add(ragTag);
             }
         }
-
         log.info("上传知识库完成 {}", ragTag);
         return Response.<String>builder().code("0000").info("调用成功").build();
 
