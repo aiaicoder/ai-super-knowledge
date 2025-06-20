@@ -16,4 +16,13 @@ public interface IRagService {
 
     Response<List<String>> queryRagTagList();
 
+    /**
+     * 分析git仓库,public无需提供密钥
+     * @param repoUrl
+     * @return
+     */
+    Response<String> analyzeGitRepository(String repoUrl);
+
+    Response<String> analyzeGitRepository(String repoUrl, String userName, String token) throws Exception;
+
 }
