@@ -47,7 +47,7 @@ public class GitTest {
     //从git上拉取文件
     @Test
     public void test() throws Exception{
-        String repoUrl = "https://github.com/aiaicoder/SuperTraveller.git";
+        String repoUrl = "https://github.com/aiaicoder/xinChat-backend.git";
 
         String localPath = "./cloned-repo";
 
