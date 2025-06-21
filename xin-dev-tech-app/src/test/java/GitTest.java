@@ -47,7 +47,7 @@ public class GitTest {
     //从git上拉取文件
     @Test
     public void test() throws Exception{
-        String repoUrl = "https://github.com/aiaicoder/xinChat-backend.git";
+        String repoUrl = "https://gitcode.com/SugarHammer/Science-Popularization-System.git";
 
         String localPath = "./cloned-repo";
 
@@ -70,25 +70,19 @@ public class GitTest {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 log.info("文件路径:{}", file.toString());
-                //读取拉去下来的文件
-                // 忽略空文件或非普通文件
-                if (attrs.size() == 0 || !Files.isRegularFile(file)) {
-                    return FileVisitResult.CONTINUE;
+                try {
+                    PathResource pathResource = new PathResource(file);
+                    TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(pathResource);
+                    List<Document> documents = tikaDocumentReader.get();
+                    List<Document> documentSplitterList = tokenTextSplitter.apply(documents);
+                    //添加元数据，打标
+                    documents.forEach(doc -> doc.getMetadata().put("knowledge", "super-travel"));
+                    documentSplitterList.forEach(doc -> doc.getMetadata().put("knowledge", "super-travel"));
+                    pgVectorStore.add(documentSplitterList);
+                } catch (Exception e) {
+                    log.error("文件解析失败:{}", file.getFileName());
                 }
-                PathResource pathResource = new PathResource(file);
-                TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(pathResource);
-                List<Document> documents = tikaDocumentReader.get();
-                // 如果没有提取到内容，跳过该文件
-                if (documents == null || documents.isEmpty()) {
-                    log.warn("未从文件中提取到有效内容: {}", file);
-                    return FileVisitResult.CONTINUE;
-                }
-                List<Document> documentSplitterList = tokenTextSplitter.apply(documents);
-                //添加元数据，打标
-                documents.forEach(doc -> doc.getMetadata().put("knowledge", "super-travel"));
-                documentSplitterList.forEach(doc -> doc.getMetadata().put("knowledge", "super-travel"));
                 //添加到向量数据库
-                pgVectorStore.add(documentSplitterList);
                 return FileVisitResult.CONTINUE;
             }
         });

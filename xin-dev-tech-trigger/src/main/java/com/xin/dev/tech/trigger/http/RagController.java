@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -53,6 +54,7 @@ public class RagController implements IRagService {
     @RequestMapping(value = "analyze_git_repository", method = RequestMethod.POST)
     public Response<String> analyzeGitRepository(String repoUrl) {
         String localPath = "./cloned-repo";
+        List<Document> allDocuments = new ArrayList<>();
         String repoProjectName = extractProjectName(repoUrl);
         log.info("克隆路径：" + new File(localPath).getAbsolutePath());
         Git git = null;
@@ -62,17 +64,21 @@ public class RagController implements IRagService {
             Files.walkFileTree(Paths.get(localPath), new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    log.info("文件路径:{}", file.toString());
-                    //读取拉去下来的文件
-                    PathResource pathResource = new PathResource(file);
-                    TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(pathResource);
-                    List<Document> documents = tikaDocumentReader.get();
-                    List<Document> documentSplitterList = tokenTextSplitter.apply(documents);
-                    //添加元数据，打标
-                    documents.forEach(doc -> doc.getMetadata().put("knowledge", repoProjectName));
-                    documentSplitterList.forEach(doc -> doc.getMetadata().put("knowledge", repoProjectName));
-                    //添加到向量数据库
-                    pgVectorStore.add(documentSplitterList);
+                    try {
+                        log.info("文件路径:{}", file.toString());
+                        //读取拉去下来的文件
+                        PathResource pathResource = new PathResource(file);
+                        TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(pathResource);
+                        List<Document> documents = tikaDocumentReader.get();
+                        List<Document> documentSplitterList = tokenTextSplitter.apply(documents);
+                        //添加元数据，打标
+                        documents.forEach(doc -> doc.getMetadata().put("knowledge", repoProjectName));
+                        documentSplitterList.forEach(doc -> doc.getMetadata().put("knowledge", repoProjectName));
+                        //收集文档
+                        allDocuments.addAll(documentSplitterList);
+                    }catch (Exception e) {
+                        log.error("解析文件错误:{}", file.getFileName());
+                    }
                     return FileVisitResult.CONTINUE;
                 }
 
@@ -82,14 +88,27 @@ public class RagController implements IRagService {
                     return FileVisitResult.CONTINUE;
                 }
             });
-            FileUtils.deleteDirectory(new File(localPath));
+
+            //批量处理
+            if (!allDocuments.isEmpty()) {
+                int batchSize = 100;
+                for (int i = 0; i < allDocuments.size(); i += batchSize) {
+                    int endIndex = Math.min(i + batchSize, allDocuments.size());
+                    List<Document> batch = allDocuments.subList(i, endIndex);
+                    pgVectorStore.accept(batch);
+                }
+            }
         } catch (Exception e) {
             log.error("Git clone error: " + e.getMessage());
         } finally {
             if (git != null) {
                 git.close();
             }
-
+        }
+        try {
+            FileUtils.deleteDirectory(new File(localPath));
+        } catch (IOException e) {
+            log.error("删除目录失败: " + e.getMessage());
         }
         log.info("遍历解析路径，上传完成:{}", repoUrl);
         RList<String> elements = redissonClient.getList("ragTag");

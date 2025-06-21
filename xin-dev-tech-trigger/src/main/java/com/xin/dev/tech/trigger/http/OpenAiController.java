@@ -1,6 +1,5 @@
 package com.xin.dev.tech.trigger.http;
 
-import com.alibaba.fastjson2.JSON;
 import com.xin.dev.tech.api.IAiService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -10,8 +9,8 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.ollama.OllamaChatClient;
-import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.ai.openai.OpenAiChatClient;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.vectorstore.PgVectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -28,36 +27,28 @@ import java.util.stream.Collectors;
 /**
  * @author <a href="https://github.com/aiaicoder">  小新
  * @version 1.0
- * @date 2025/6/17 20:36
+ * @date 2025/6/21 19:40
  */
-@RequestMapping("/api/v1/ollama")
+@RequestMapping("/api/v1/openAi")
 @CrossOrigin("*")
 @RestController()
 @Slf4j
-public class OllamaController implements IAiService {
-
+public class OpenAiController implements IAiService {
     @Resource
-    private OllamaChatClient ollamaChatClient;
-
+    private OpenAiChatClient chatClient;
     @Resource
     private PgVectorStore pgVectorStore;
 
-    /**
-     * http://localhost:8090/api/v1/ollama/generate?model=deepseek-r1:1.5b&message=1+1
-     */
     @Override
     @RequestMapping(value = "/generate" ,method = RequestMethod.GET)
     public ChatResponse generate(String model, String message) {
-        return ollamaChatClient.call(new Prompt(message, OllamaOptions.create().withModel(model)));
+       return  chatClient.call(new Prompt(message, OpenAiChatOptions.builder().withModel(model).build()));
     }
 
-    /**
-     * http://localhost:8090/api/v1/ollama/generate_stream?model=deepseek-r1:1.5b&message=hi
-     */
     @Override
     @RequestMapping(value = "/generate_stream",method = RequestMethod.GET)
     public Flux<ChatResponse> generateStream(String model, String message) {
-        return ollamaChatClient.stream(new Prompt(message, OllamaOptions.create().withModel(model)));
+        return chatClient.stream(new Prompt(message, OpenAiChatOptions.builder().withModel(model).build()));
     }
 
     @Override
@@ -81,7 +72,6 @@ public class OllamaController implements IAiService {
         ArrayList<Message> messages = new ArrayList<>();
         messages.add(new UserMessage(message));
         messages.add(ragMessage);
-        return ollamaChatClient.stream(new Prompt(messages, OllamaOptions.create().withModel("deepseek-r1:1.5b")));
-
+        return chatClient.stream(new Prompt(messages, OpenAiChatOptions.builder().withModel(model).build()));
     }
 }
